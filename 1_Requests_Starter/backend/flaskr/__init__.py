@@ -1,4 +1,5 @@
 import os
+from re import search
 from flask import Flask, request, abort, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
@@ -106,16 +107,27 @@ def create_app(test_config=None):
         new_title = body.get("title", None)
         new_author = body.get("author", None)
         new_rating = body.get("rating", None)
+        search = body.get('search', None)
 
         try:
-            book = Book(title=new_title, author=new_author, rating=new_rating)
-            book.insert()
+            if search:
+                selection = Book.query.order_by(Book.id).filter(Book.title.ilike("%{}%".format(search)))
+                current_books = paginate_books(request, selection)
 
-            selection = Book.query.order_by(Book.id).all()
-            current_books = paginate_books(request, selection)
+                return jsonify({
+                        "success": True,
+                        "books": current_books,
+                        "total_books": len(selection.all())
+                    })
+            else:    
 
-            return jsonify(
-                {
+                book = Book(title=new_title, author=new_author, rating=new_rating)
+                book.insert()
+
+                selection = Book.query.order_by(Book.id).all()
+                current_books = paginate_books(request, selection)
+
+                return jsonify({
                     "success": True,
                     "created": book.id,
                     "books": current_books,
@@ -127,6 +139,7 @@ def create_app(test_config=None):
             abort(422)
 
 
+              
     @app.errorhandler(404)
     def not_found(error):
         return jsonify({
